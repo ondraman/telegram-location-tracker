@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Location Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Změněno z 'supabase' na 'supabaseClient'
+        const supabaseClient = supabase.createClient(
+            'https://woqcaafmlzkojbyqoncg.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvcWNhYWZtbHprb2pieXFvbmNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MTQzMzgsImV4cCI6MjA4NDQ5MDMzOH0.A6W8mMhtRQYPXl3iUB6UK9O0m3yFtmndM2gheP0c77Q'
+        );
+
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+    version: 8,
+    sources: {
+        osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '&copy; OpenStreetMap Contributors',
+            maxzoom: 19
+        }
+    },
+    layers: [{
+        id: 'osm',
+        type: 'raster',
+        source: 'osm'
+    }]
+},
+        });
+
+        let markers = {};
+
+        async function loadLocations() {
+            // Použití supabaseClient
+            const { data } = await supabaseClient.from('locations').select('*').order('created_at', { ascending: false });
+            
+            if (data) {
+                data.forEach(loc => {
+                    if (!markers[loc.id]) {
+                        const marker = new maplibregl.Marker()
+                            .setLngLat([loc.longitude, loc.latitude])
+                            .setPopup(new maplibregl.Popup().setHTML(`
+                                <strong>User: ${loc.user_id}</strong><br>
+                                ${new Date(loc.created_at).toLocaleString()}
+                            `))
+                            .addTo(map);
+                        markers[loc.id] = marker;
+                    }
+                });
+
+                if (data.length > 0) {
+                    map.flyTo({ center: [data[0].longitude, data[0].latitude], zoom: 14 });
+                }
+            }
+        }
+
+        // Použití supabaseClient pro Realtime
+        supabaseClient.channel('locations')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'locations' }, (payload) => {
+                const loc = payload.new;
+                const marker = new maplibregl.Marker()
+                    .setLngLat([loc.longitude, loc.latitude])
+                    .setPopup(new maplibregl.Popup().setHTML(`
+                        <strong>User: ${loc.user_id}</strong><br>
+                        ${new Date(loc.created_at).toLocaleString()}
+                    `))
+                    .addTo(map);
+                markers[loc.id] = marker;
+                map.flyTo({ center: [loc.longitude, loc.latitude], zoom: 14 });
+            })
+            .subscribe();
+
+        map.on('load', loadLocations);
+    </script>
+</body>
+</html>
