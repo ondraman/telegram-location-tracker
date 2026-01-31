@@ -74,7 +74,8 @@
         // Helper function to build popup HTML
         function buildPopupHTML(loc) {
             let html = '<div class="popup-content">';
-            html += `<div class="user-id">User: ${loc.user_id}</div>`;
+            const displayName = loc.display_name || `User: ${loc.user_id}`;
+            html += `<div class="user-id">${escapeHtml(displayName)}</div>`;
             html += `<div class="timestamp">${new Date(loc.created_at).toLocaleString()}</div>`;
 
             if (loc.text) {
@@ -134,3 +135,4 @@
     </script>
 </body>
 </html>
+
