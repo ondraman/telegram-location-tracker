@@ -8,8 +8,35 @@
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .popup-content {
+            max-width: 250px;
+            padding: 5px;
+        }
+        .popup-content .user-id {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .popup-content .timestamp {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .popup-content .text {
+            color: #333;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+        .popup-content .photo {
+            margin-top: 5px;
+        }
+        .popup-content .photo img {
+            max-width: 100%;
+            border-radius: 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -44,19 +71,41 @@
 
         let markers = {};
 
+        // Helper function to build popup HTML
+        function buildPopupHTML(loc) {
+            let html = '<div class="popup-content">';
+            html += `<div class="user-id">User: ${loc.user_id}</div>`;
+            html += `<div class="timestamp">${new Date(loc.created_at).toLocaleString()}</div>`;
+
+            if (loc.text) {
+                html += `<div class="text">${escapeHtml(loc.text)}</div>`;
+            }
+
+            if (loc.photo_url) {
+                html += `<div class="photo"><a href="${escapeHtml(loc.photo_url)}" target="_blank"><img src="${escapeHtml(loc.photo_url)}" alt="Photo"></a></div>`;
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function loadLocations() {
             // Použití supabaseClient
             const { data } = await supabaseClient.from('locations').select('*').order('created_at', { ascending: false });
-            
+
             if (data) {
                 data.forEach(loc => {
                     if (!markers[loc.id]) {
                         const marker = new maplibregl.Marker()
                             .setLngLat([loc.longitude, loc.latitude])
-                            .setPopup(new maplibregl.Popup().setHTML(`
-                                <strong>User: ${loc.user_id}</strong><br>
-                                ${new Date(loc.created_at).toLocaleString()}
-                            `))
+                            .setPopup(new maplibregl.Popup().setHTML(buildPopupHTML(loc)))
                             .addTo(map);
                         markers[loc.id] = marker;
                     }
@@ -74,10 +123,7 @@
                 const loc = payload.new;
                 const marker = new maplibregl.Marker()
                     .setLngLat([loc.longitude, loc.latitude])
-                    .setPopup(new maplibregl.Popup().setHTML(`
-                        <strong>User: ${loc.user_id}</strong><br>
-                        ${new Date(loc.created_at).toLocaleString()}
-                    `))
+                    .setPopup(new maplibregl.Popup().setHTML(buildPopupHTML(loc)))
                     .addTo(map);
                 markers[loc.id] = marker;
                 map.flyTo({ center: [loc.longitude, loc.latitude], zoom: 14 });
